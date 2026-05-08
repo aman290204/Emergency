@@ -2140,7 +2140,14 @@ def menu():
                             with open(file_path, 'r', encoding='utf-8') as f:
                                 data = json.load(f)
                                 items = _find_items_structure(data)
-                                question_count = len(items)
+                                # Exclude stimulus/vignette-only entries (no choices) — matches quiz count
+                                question_count = sum(
+                                    1 for it in items
+                                    if it.get("entryType") != "Stimulus"
+                                    and not (it.get("entry", {}).get("title") == "Vignette"
+                                             and not it.get("entry", {}).get("interactionData")
+                                             and not it.get("entry", {}).get("choices"))
+                                )
                         except Exception:
                             question_count = 0
 
