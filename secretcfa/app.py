@@ -587,8 +587,8 @@ def load_questions_from_file(path):
         else:
             cleaned_feedback = {"neutral": preserve_html(feedback) if feedback else ""}
 
-        # Attach linked stimulus if available
-        stim_id = e.get("stimulusQuizEntryId")
+        # Attach linked stimulus if available — field can be on outer item OR inner entry
+        stim_id = it.get("stimulusQuizEntryId") or e.get("stimulusQuizEntryId")
         attached_stim = stimuli.get(stim_id)
 
         q = {
