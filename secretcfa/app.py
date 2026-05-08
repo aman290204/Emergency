@@ -29,6 +29,9 @@ app.config['SESSION_COOKIE_SECURE'] = 'RENDER' in os.environ  # True on Render, 
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
+# Setting to allow public registration
+ALLOW_PUBLIC_REGISTRATION = os.environ.get('ALLOW_PUBLIC_REGISTRATION', 'True').lower() in ('true', '1', 'yes')
+
 # ---------- HEALTH CHECK SYSTEM FOR RENDER UPTIME ----------
 # Dedicated lightweight endpoint - NO auth, NO Redis, NO side effects
 
@@ -1878,20 +1881,20 @@ def login():
     if request.method == 'GET':
         # Show login form
         error = request.args.get('error', '')
-        return render_template_string(LOGIN_TEMPLATE, error=error)
+        return render_template_string(LOGIN_TEMPLATE, error=error, allow_register=ALLOW_PUBLIC_REGISTRATION)
     
     # POST request - process login
     user_id = request.form.get('user_id', '').strip()
     password = request.form.get('password', '').strip()
     
     if not user_id or not password:
-        return render_template_string(LOGIN_TEMPLATE, error="Please enter both user ID and password")
+        return render_template_string(LOGIN_TEMPLATE, error="Please enter both user ID and password", allow_register=ALLOW_PUBLIC_REGISTRATION)
     
     # Validate credentials
     user = authenticate_user(user_id, password)
     
     if not user:
-        return render_template_string(LOGIN_TEMPLATE, error="Invalid credentials or account expired")
+        return render_template_string(LOGIN_TEMPLATE, error="Invalid credentials or account expired", allow_register=ALLOW_PUBLIC_REGISTRATION)
     
     # ===== SINGLE-SESSION ENFORCEMENT =====
     # Step 1: Invalidate all existing sessions for this user (logs out other devices)
@@ -1945,6 +1948,29 @@ def login():
     
     # Redirect to menu for all users
     return redirect(url_for('menu'))
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Public registration handler"""
+    if not ALLOW_PUBLIC_REGISTRATION:
+        return redirect(url_for('login', error="Public registration is currently disabled."))
+        
+    if request.method == 'GET':
+        error = request.args.get('error', '')
+        return render_template_string(REGISTER_TEMPLATE, error=error)
+        
+    user_id = request.form.get('user_id', '').strip()
+    password = request.form.get('password', '').strip()
+    name = request.form.get('name', '').strip()
+    
+    if not user_id or not password or not name:
+        return render_template_string(REGISTER_TEMPLATE, error="Please fill all fields")
+        
+    success, msg = add_user(user_id, password, name)
+    if success:
+        return redirect(url_for('login', error="Registration successful! Please login."))
+    else:
+        return render_template_string(REGISTER_TEMPLATE, error=msg)
 
 @app.route('/logout')
 def logout():
@@ -2696,6 +2722,105 @@ def delete_attempt(attempt_id):
 
 # ---------- TEMPLATES ----------
 
+REGISTER_TEMPLATE = """
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Register – SecretCFA</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(145deg,#060e1f 0%,#0a1628 30%,#0c1e40 60%,#0d2455 100%);
+  position:relative;overflow:hidden;
+}
+.card{
+  position:relative;z-index:10;
+  width:100%;max-width:420px;margin:0 16px;
+  padding:40px;border-radius:20px;
+  background:rgba(10,18,40,.72);
+  border:1px solid rgba(255,255,255,.1);
+  backdrop-filter:blur(32px) saturate(1.4);
+  -webkit-backdrop-filter:blur(32px) saturate(1.4);
+  box-shadow:0 40px 80px rgba(0,0,0,.5),0 0 0 1px rgba(255,255,255,.04) inset,0 0 60px rgba(245,197,24,.04);
+}
+.logo-row{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:28px}
+.logo-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,#f5c518,#e6a800);
+  box-shadow:0 4px 16px rgba(245,197,24,.35);font-size:20px;flex-shrink:0}
+.logo-text{color:#fff;font-weight:700;font-size:22px;letter-spacing:-.02em}
+.logo-text span{color:#f5c518}
+.heading{text-align:center;margin-bottom:28px}
+.heading h2{color:#fff;font-weight:700;font-size:1.75rem;letter-spacing:-.02em;margin-bottom:6px}
+.heading p{font-size:13px;color:rgba(255,255,255,.42)}
+.error-box{
+  background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.3);
+  border-radius:10px;padding:12px 16px;color:#f87171;
+  font-size:13px;margin-bottom:20px;text-align:center;
+}
+.field{margin-bottom:18px}
+.field label{display:block;font-size:13px;font-weight:600;color:rgba(255,255,255,.7);margin-bottom:6px}
+.field input[type=text], .field input[type=password]{
+  width:100%;padding:13px 16px;border-radius:12px;font-size:13.5px;
+  font-family:'Inter',sans-serif;outline:none;
+  background:rgba(255,255,255,.05);
+  border:1.5px solid rgba(255,255,255,.1);
+  color:#fff;transition:all .2s;
+}
+.field input:focus{
+  background:rgba(255,255,255,.09);border-color:rgba(245,197,24,.65);
+}
+.submit-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px;border-radius:12px;border:none;cursor:pointer;
+  font-size:13.5px;font-weight:700;font-family:'Inter',sans-serif;
+  background:linear-gradient(135deg,#f5c518 0%,#e6a800 100%);
+  color:#0a1628;letter-spacing:.01em;
+  box-shadow:0 4px 24px rgba(245,197,24,.35),0 0 0 1px rgba(245,197,24,.2) inset;
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo-row">
+    <div class="logo-icon">✨</div>
+    <div class="logo-text">Secret<span>CFA</span></div>
+  </div>
+  <div class="heading">
+    <h2>Create an Account</h2>
+    <p>Join the CFA preparation platform</p>
+  </div>
+  {% if error %}
+  <div class="error-box">{{ error }}</div>
+  {% endif %}
+  <form method="POST">
+    <div class="field">
+      <label for="name">Full Name</label>
+      <input type="text" id="name" name="name" placeholder="John Doe" required/>
+    </div>
+    <div class="field">
+      <label for="user_id">Username / User ID</label>
+      <input type="text" id="user_id" name="user_id" placeholder="Choose a unique ID" required/>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Create a strong password" required/>
+    </div>
+    <button type="submit" class="submit-btn">Sign Up</button>
+    <div style="text-align:center;margin-top:20px;">
+      <a href="/login" style="color:rgba(255,255,255,0.6);text-decoration:none;font-size:13px;transition:color 0.2s;">Already have an account? Login</a>
+    </div>
+  </form>
+</div>
+</body>
+</html>
+"""
+
 LOGIN_TEMPLATE = """
 <!doctype html>
 <html lang="en">
@@ -2890,7 +3015,7 @@ body{
 
   <!-- Error -->
   {% if error %}
-  <div class="error-box">{{ error }}</div>
+  <div class="error-box" {% if 'successful' in error.lower() %}style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#4ade80;"{% endif %}>{{ error }}</div>
   {% endif %}
 
   <!-- Form -->
@@ -2924,6 +3049,12 @@ body{
       Access Dashboard
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
     </button>
+
+    {% if allow_register %}
+    <div style="text-align:center;margin-top:20px;">
+      <a href="/register" style="color:#f5c518;text-decoration:none;font-size:13px;font-weight:600;opacity:0.9;transition:opacity 0.2s;">Need an account? Sign up here</a>
+    </div>
+    {% endif %}
 
   </form>
 
