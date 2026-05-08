@@ -1115,7 +1115,7 @@ async function checkForPausedAttempt() {
       questionTimeStart = Date.now();
       
       // Re-render current question with restored state
-      render();
+      render(idx);
       updateProgress();
       
       console.log(`✅ Resumed from question ${idx + 1}, elapsed time: ${previousElapsed}s`);
