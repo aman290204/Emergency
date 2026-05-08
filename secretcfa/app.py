@@ -521,9 +521,13 @@ def load_questions_from_file(path):
             if stim_content:
                 stimuli[it.get("id")] = preserve_html(stim_content)
 
-    # Pass 2: Process all items
+    # Pass 2: Process all items (skip stimulus/vignette entries — they have no choices)
     for it in items:
+        if it.get("entryType") == "Stimulus":
+            continue
         e = get_entry(it)
+        if e.get("title") == "Vignette" and not (e.get("interactionData") or e.get("choices")):
+            continue
 
         # Stimuli use "body", regular questions use "itemBody"
         raw_stem = e.get("itemBody") or e.get("body") or e.get("stem") or e.get("question") or ""
